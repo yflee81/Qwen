@@ -1,8 +1,6 @@
 # Qwen3 HADR Translation Fine-tuner
 
-Fine-tune **Qwen3** to translate HADR (Humanitarian Assistance and Disaster
-Relief) jargon from **Malay (ms)** and **Chinese (zh)** into **English**, using
-**QLoRA** for memory-efficient training on a single consumer GPU.
+Fine‑tune **Qwen3** to translate HADR (Humanitarian Assistance and Disaster Relief) jargon from **Malay (ms), Chinese (zh), Indonesian (id), Tagalog (tl), Thai (th), Burmese (my), Lao (lo), Hindi (hi), Korean (ko), Japanese (ja), French (fr), and Vietnamese (vi)** into **English**, using **QLoRA** for memory‑efficient training on a single consumer GPU.
 
 ---
 
