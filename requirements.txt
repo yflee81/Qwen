@@ -1,0 +1,22 @@
+# Core ML
+torch>=2.2.0
+transformers>=4.47.0
+datasets>=2.19.0
+peft>=0.10.0
+trl>=0.8.6
+bitsandbytes>=0.43.0      # 4-bit quantisation (QLoRA)
+accelerate>=0.29.0
+
+# Evaluation
+evaluate>=0.4.1
+sacrebleu>=2.4.0
+rouge-score>=0.1.2
+pip install bert_score
+
+# Utilities
+pyyaml>=6.0
+numpy>=1.26.0
+tensorboard>=2.16.0       # swap for wandb if preferred
+
+# Optional — weights & biases
+# wandb>=0.17.0
