@@ -3,41 +3,41 @@ inference.py — Load a fine-tuned Qwen3 HADR adapter and translate text,
                with optional on-demand HADR key-point summarisation.
 
 Usage (interactive, text):
-    python inference.py --model_dir ./checkpoints/final
+    python inference.py --model_dir ./merged_model
 
 Usage (interactive, mic input):
-    python inference.py --model_dir ./checkpoints/final --whisper medium
+    python inference.py --model_dir ./merged_model --whisper medium
 
 Usage (batch file):
-    python inference.py --model_dir ./checkpoints/final \
+    python inference.py --model_dir ./merged_model \
                         --input data/test_inputs.jsonl \
                         --output results/predictions.jsonl
 
 Usage (single sentence):
-    python inference.py --model_dir ./checkpoints/final \
+    python inference.py --model_dir ./merged_model \
                         --text "Operasi SAR sedang dijalankan." \
                         --lang ms
 
 Usage (single sentence + immediate summary):
-    python inference.py --model_dir ./checkpoints/final \
+    python inference.py --model_dir ./merged_model \
                         --text "Operasi SAR sedang dijalankan." \
                         --lang ms \
                         --summarise
 
 Usage (batch with summaries written to output):
-    python inference.py --model_dir ./checkpoints/final \
+    python inference.py --model_dir ./merged_model \
                         --input data/test_inputs.jsonl \
                         --output results/predictions.jsonl \
                         --summarise
 
 Usage (transcribe audio file then translate):
-    python inference.py --model_dir ./checkpoints/final \
+    python inference.py --model_dir ./merged_model \
                         --whisper medium \
                         --audio recording.mp3 \
                         --lang ms
 
 Usage (record from mic then translate):
-    python inference.py --model_dir ./checkpoints/final \
+    python inference.py --model_dir ./merged_model \
                         --whisper medium \
                         --record 15 \
                         --lang zh
@@ -111,7 +111,13 @@ def load_model(model_dir: str, base_model: str | None = None):
     If model_dir contains a full merged model, load directly.
     If it contains LoRA adapters only, provide --base_model.
     """
-    model_dir = Path(model_dir)
+    model_dir = Path(model_dir).expanduser().resolve()
+    if not model_dir.exists():
+        raise FileNotFoundError(
+            f"Model directory not found: {model_dir}. "
+            "Pass --model_dir with the path to merged_model or your checkpoint folder."
+        )
+
     tokenizer = AutoTokenizer.from_pretrained(str(model_dir), trust_remote_code=True)
 
     bnb_config = BitsAndBytesConfig(
@@ -149,7 +155,7 @@ def load_model(model_dir: str, base_model: str | None = None):
 # Whisper Audio Transcription
 # ─────────────────────────────────────────────
 
-def load_whisper_model(size: str = "medium"):
+def load_whisper_model(size: str = "small"):
     """
     Load a Whisper model.
     Recommended sizes for a 16 GB GPU running alongside Qwen3-8B:
@@ -502,7 +508,7 @@ def interactive_loop(model, tokenizer, whisper_model=None):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="HADR Translation Inference")
-    parser.add_argument("--model_dir",      required=True,  help="Path to fine-tuned model/adapter")
+    parser.add_argument("--model_dir",      default="./merged_model",  help="Path to merged model/adapter")
     parser.add_argument("--base_model",     default=None,   help="Base model name (if using LoRA-only dir)")
     parser.add_argument("--input",          default=None,   help="Input JSONL for batch translation")
     parser.add_argument("--output",         default="results/predictions.jsonl")

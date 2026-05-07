@@ -5,13 +5,13 @@ server.py — Flask API server bridging hadr_translator.html to Summary.py.
 
 Usage:
     # Qwen only (browser Web Speech API used for STT)
-    python server.py --model_dir ./checkpoints/final
+    python server.py --model_dir ./merged_model
 
     # Qwen + Whisper (recommended for offline/production STT)
-    python server.py --model_dir ./checkpoints/final --whisper medium
+    python server.py --model_dir ./merged_model --whisper medium
 
     # All options
-    python server.py --model_dir ./checkpoints/final \
+    python server.py --model_dir ./merged_model \
                      --base_model Qwen/Qwen3-8B \
                      --whisper medium \
                      --host 0.0.0.0 \
@@ -42,7 +42,7 @@ import logging
 import os
 import tempfile
 
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
 
 # ── Import from Summary.py (must be in the same directory) ────
@@ -76,6 +76,11 @@ def health():
         "qwen_loaded":    _model is not None,
         "whisper_loaded": _whisper_model is not None,
     })
+
+
+@app.route("/", methods=["GET"])
+def index():
+    return send_from_directory(os.path.dirname(__file__), "hadr_translator.html")
 
 
 # ─────────────────────────────────────────────────────────────
@@ -237,8 +242,8 @@ def main():
     global _model, _tokenizer, _whisper_model, _max_new_tokens
 
     parser = argparse.ArgumentParser(description="HADR Translator API Server")
-    parser.add_argument("--model_dir",       required=True,
-                        help="Path to fine-tuned Qwen model/adapter directory")
+    parser.add_argument("--model_dir",       default="./merged_model",
+                        help="Path to merged Qwen model or adapter directory")
     parser.add_argument("--base_model",      default=None,
                         help="Base model name (only needed for LoRA-only adapter dirs)")
     parser.add_argument("--whisper",         default=None,

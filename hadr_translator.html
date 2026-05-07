@@ -864,6 +864,7 @@ const state = {
   autoDetect:   false,
   currentTranslation: '',
   currentSource: '',
+  currentTranscription: '',
   metrics: { translations: 0, summaries: 0, voice: 0, files: 0 },
   history: [],
   recording: false,
@@ -905,7 +906,9 @@ const EXAMPLES = {
 // API: calls to backend (Summary.py / inference server)
 // ─────────────────────────────────────────────────────────────
 
-const API_BASE = 'http://localhost:5000'; // adjust to your backend port
+const API_BASE = location.origin && location.origin.startsWith('http')
+  ? location.origin
+  : 'http://localhost:5000';
 
 async function apiTranslate(text, lang) {
   const res = await fetch(`${API_BASE}/translate`, {
@@ -1285,8 +1288,8 @@ const sttTranslateBtn = document.getElementById('sttTranslateBtn');
 const rings           = [document.getElementById('ring1'),document.getElementById('ring2'),document.getElementById('ring3')];
 
 micBtn.addEventListener('click', () => {
-  if (!speechRecognition) {
-    toast('Web Speech API not supported — use Chrome/Edge', 'error');
+  if (!navigator.mediaDevices?.getUserMedia || !window.MediaRecorder) {
+    toast('Audio recording is not supported in this window', 'error');
     return;
   }
   if (!state.recording) startRecording();
@@ -1309,12 +1312,13 @@ async function startRecording() {
   state.recordSeconds = 0;
   audioChunks = [];
 
-  const recorder = new MediaRecorder(mediaStream, { mimeType: 'audio/webm' });
+  const mimeType = MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' : '';
+  const recorder = new MediaRecorder(mediaStream, mimeType ? { mimeType } : undefined);
   state.mediaRecorder = recorder;
 
   recorder.ondataavailable = e => { if (e.data.size > 0) audioChunks.push(e.data); };
   recorder.onstop = async () => {
-    const blob = new Blob(audioChunks, { type: 'audio/webm' });
+    const blob = new Blob(audioChunks, { type: mimeType || 'audio/webm' });
     await sendAudioToWhisper(blob);
   };
 
@@ -1361,6 +1365,7 @@ async function sendAudioToWhisper(blob) {
     const data = await res.json();
 
     sttTranscription.textContent = data.transcript;
+    state.currentTranscription = data.transcript || '';
     sttTranslateBtn.disabled = false;
     sttInfo.textContent = 'Transcription complete. Ready to translate.';
     toast('Whisper transcription complete ✓');
@@ -1374,6 +1379,48 @@ async function sendAudioToWhisper(blob) {
 // ─────────────────────────────────────────────────────────────
 // File Upload
 // ─────────────────────────────────────────────────────────────
+
+sttTranslateBtn.addEventListener('click', async () => {
+  const text = (state.currentTranscription || sttTranscription.textContent || '').trim();
+  if (!text || text.startsWith('Transcription ')) {
+    toast('No transcription available to translate', 'error');
+    return;
+  }
+
+  showLoading();
+  setStatus('TRANSLATING TRANSCRIPTION...');
+  sttTranslateBtn.disabled = true;
+  sttTranslation.textContent = 'Translating...';
+
+  try {
+    const result = await callTranslate(text, state.selectedLang);
+    sttTranslation.textContent = result;
+    state.currentSource = text;
+    state.currentTranslation = result;
+    state.metrics.translations++;
+    updateMetrics();
+    addHistory(state.selectedLang, text, result);
+    document.getElementById('sumExtractBtn').disabled = false;
+    document.getElementById('sumStatus').textContent = 'STT translation loaded';
+    setStatus('SYSTEM READY');
+    toast('Transcription translated');
+  } catch(e) {
+    sttTranslation.textContent = 'Translation failed: ' + e.message;
+    setStatus('ERROR', false);
+    toast('Translation failed: ' + e.message, 'error');
+  } finally {
+    hideLoading();
+    sttTranslateBtn.disabled = false;
+  }
+});
+
+document.getElementById('sttClearBtn').addEventListener('click', () => {
+  state.currentTranscription = '';
+  sttTranscription.textContent = 'Transcription will appear here...';
+  sttTranslation.textContent = '-';
+  sttTranslateBtn.disabled = true;
+  sttInfo.textContent = 'Click the microphone to start recording';
+});
 
 const dropZone       = document.getElementById('dropZone');
 const fileInput      = document.getElementById('fileInput');

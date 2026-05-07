@@ -72,22 +72,44 @@ The best model (highest BLEU on validation set) is saved to `./checkpoints/final
 
 **Interactive REPL:**
 ```bash
-python inference.py --model_dir ./checkpoints/final
+python inference.py --model_dir ./merged_model
 ```
 
 **Single sentence:**
 ```bash
-python inference.py --model_dir ./checkpoints/final \
+python inference.py --model_dir ./merged_model \
                     --text "Pasukan SAR sedang menjalankan operasi." \
                     --lang ms
 ```
 
 **Batch file:**
 ```bash
-python inference.py --model_dir ./checkpoints/final \
+python inference.py --model_dir ./merged_model \
                     --input data/test_inputs.jsonl \
                     --output results/predictions.jsonl
 ```
+
+### 6. Desktop app
+
+Install the dependencies, then launch the desktop wrapper:
+
+```bash
+pip install -r requirements.txt
+python desktop_app.py
+```
+
+On Windows you can also double-click `launch_desktop_app.bat`. Whisper `small`
+loads automatically for voice transcription. To use a larger Whisper model,
+pass an override:
+
+```bash
+launch_desktop_app.bat --whisper medium
+```
+
+The launcher uses `./merged_model` by default, starts `server.py` with Whisper,
+waits for the local Flask API to be ready, and opens `hadr_translator.html` in a
+desktop window. If `pywebview` is not installed, it falls back to your default
+browser.
 
 ---
 
