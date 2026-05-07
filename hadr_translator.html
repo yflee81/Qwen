@@ -1,0 +1,1495 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>HADR Translator — Operational Intelligence</title>
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Barlow+Condensed:wght@300;400;600;700;900&family=Barlow:wght@300;400;500&display=swap" rel="stylesheet" />
+
+<style>
+:root {
+  --bg:          #060a0f;
+  --panel:       #0b1017;
+  --panel2:      #0f1822;
+  --border:      #1a2a3a;
+  --border2:     #243448;
+  --accent:      #00d4ff;
+  --accent2:     #ff6b35;
+  --accent3:     #39ff8c;
+  --text:        #c8dcea;
+  --text-dim:    #5a7a90;
+  --text-bright: #e8f4ff;
+  --mono:        'Share Tech Mono', monospace;
+  --head:        'Barlow Condensed', sans-serif;
+  --body:        'Barlow', sans-serif;
+  --radius:      4px;
+  --glow:        0 0 20px rgba(0,212,255,0.25);
+  --glow2:       0 0 20px rgba(255,107,53,0.3);
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body {
+  height: 100%;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--body);
+  font-size: 14px;
+  overflow-x: hidden;
+}
+
+/* ── Grid noise overlay ── */
+body::before {
+  content: '';
+  position: fixed; inset: 0; z-index: 0;
+  background-image:
+    repeating-linear-gradient(0deg, transparent, transparent 39px, rgba(0,212,255,0.02) 40px),
+    repeating-linear-gradient(90deg, transparent, transparent 39px, rgba(0,212,255,0.02) 40px);
+  pointer-events: none;
+}
+
+/* ── Scanline effect ── */
+body::after {
+  content: '';
+  position: fixed; inset: 0; z-index: 0;
+  background: repeating-linear-gradient(
+    to bottom,
+    rgba(0,0,0,0) 0px, rgba(0,0,0,0) 2px,
+    rgba(0,0,0,0.08) 2px, rgba(0,0,0,0.08) 4px
+  );
+  pointer-events: none;
+}
+
+.app { position: relative; z-index: 1; min-height: 100vh; display: flex; flex-direction: column; }
+
+/* ── Header ── */
+header {
+  padding: 18px 32px 16px;
+  border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; justify-content: space-between;
+  background: rgba(11,16,23,0.95);
+  position: sticky; top: 0; z-index: 100;
+  backdrop-filter: blur(10px);
+}
+
+.logo {
+  display: flex; align-items: center; gap: 14px;
+}
+
+.logo-badge {
+  width: 36px; height: 36px;
+  border: 2px solid var(--accent);
+  display: flex; align-items: center; justify-content: center;
+  font-family: var(--mono); font-size: 11px; color: var(--accent);
+  box-shadow: var(--glow), inset 0 0 10px rgba(0,212,255,0.05);
+  animation: pulse-border 3s ease-in-out infinite;
+  position: relative;
+}
+
+.logo-badge::before {
+  content: '';
+  position: absolute; inset: -4px;
+  border: 1px solid rgba(0,212,255,0.15);
+}
+
+@keyframes pulse-border {
+  0%,100% { box-shadow: var(--glow), inset 0 0 10px rgba(0,212,255,0.05); }
+  50%      { box-shadow: 0 0 30px rgba(0,212,255,0.4), inset 0 0 15px rgba(0,212,255,0.1); }
+}
+
+.logo-text { line-height: 1; }
+.logo-title {
+  font-family: var(--head); font-weight: 900; font-size: 22px; letter-spacing: 0.12em;
+  color: var(--text-bright); text-transform: uppercase;
+}
+.logo-sub {
+  font-family: var(--mono); font-size: 10px; color: var(--accent); letter-spacing: 0.2em;
+  text-transform: uppercase; margin-top: 2px;
+}
+
+.header-status {
+  display: flex; align-items: center; gap: 6px;
+  font-family: var(--mono); font-size: 11px; color: var(--text-dim);
+}
+.status-dot {
+  width: 7px; height: 7px; border-radius: 50%;
+  background: var(--accent3); box-shadow: 0 0 8px var(--accent3);
+  animation: blink 2s step-end infinite;
+}
+@keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.2} }
+
+/* ── Main layout ── */
+main {
+  flex: 1; display: grid;
+  grid-template-columns: 300px 1fr;
+  grid-template-rows: auto 1fr;
+  gap: 0;
+  padding: 0;
+}
+
+/* ── Mode tabs ── */
+.mode-tabs {
+  grid-column: 1 / -1;
+  display: flex; gap: 0;
+  border-bottom: 1px solid var(--border);
+  padding: 0 32px;
+  background: var(--panel);
+}
+
+.tab {
+  padding: 14px 24px 12px;
+  font-family: var(--head); font-weight: 600; font-size: 13px;
+  letter-spacing: 0.12em; text-transform: uppercase;
+  color: var(--text-dim); cursor: pointer;
+  border-bottom: 2px solid transparent; margin-bottom: -1px;
+  transition: all 0.2s; display: flex; align-items: center; gap: 8px;
+  user-select: none;
+}
+.tab:hover { color: var(--text); }
+.tab.active {
+  color: var(--accent); border-bottom-color: var(--accent);
+}
+.tab-icon { font-size: 15px; }
+
+/* ── Sidebar ── */
+aside {
+  grid-row: 2;
+  border-right: 1px solid var(--border);
+  background: var(--panel);
+  padding: 24px 20px;
+  overflow-y: auto;
+  display: flex; flex-direction: column; gap: 20px;
+}
+
+.section-label {
+  font-family: var(--mono); font-size: 10px; letter-spacing: 0.25em;
+  color: var(--text-dim); text-transform: uppercase;
+  margin-bottom: 10px;
+}
+
+/* Language selector */
+.lang-grid {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 6px;
+}
+.lang-btn {
+  padding: 7px 6px;
+  border: 1px solid var(--border2);
+  background: transparent; color: var(--text-dim);
+  font-family: var(--mono); font-size: 11px; letter-spacing: 0.05em;
+  cursor: pointer; border-radius: var(--radius);
+  transition: all 0.15s; text-align: center;
+}
+.lang-btn:hover { border-color: var(--accent); color: var(--text); }
+.lang-btn.active {
+  border-color: var(--accent); background: rgba(0,212,255,0.08);
+  color: var(--accent); box-shadow: var(--glow);
+}
+
+/* Options */
+.option-row {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 8px 0; border-bottom: 1px solid var(--border);
+}
+.option-label { font-size: 13px; color: var(--text); }
+.option-sub { font-family: var(--mono); font-size: 10px; color: var(--text-dim); margin-top: 2px; }
+
+/* Toggle switch */
+.toggle {
+  width: 38px; height: 20px;
+  background: var(--border2); border-radius: 10px;
+  cursor: pointer; position: relative; transition: background 0.2s;
+  flex-shrink: 0;
+}
+.toggle.on { background: var(--accent); }
+.toggle::after {
+  content: ''; position: absolute;
+  width: 14px; height: 14px; border-radius: 50%;
+  background: #fff; top: 3px; left: 3px;
+  transition: transform 0.2s;
+}
+.toggle.on::after { transform: translateX(18px); }
+
+/* Metrics panel */
+.metrics {
+  display: flex; flex-direction: column; gap: 8px;
+}
+.metric {
+  display: flex; justify-content: space-between; align-items: center;
+  font-family: var(--mono); font-size: 11px;
+}
+.metric-label { color: var(--text-dim); }
+.metric-value { color: var(--accent3); }
+
+/* History */
+.history-list {
+  display: flex; flex-direction: column; gap: 6px;
+  max-height: 200px; overflow-y: auto;
+}
+.history-item {
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  cursor: pointer; transition: border-color 0.15s;
+  font-size: 12px; color: var(--text-dim);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.history-item:hover { border-color: var(--border2); color: var(--text); }
+.history-item .hist-lang {
+  font-family: var(--mono); font-size: 10px; color: var(--accent2);
+  margin-bottom: 3px;
+}
+
+/* ── Content area ── */
+.content {
+  grid-row: 2;
+  display: flex; flex-direction: column;
+  overflow: hidden;
+}
+
+/* Tab panels */
+.tab-panel { display: none; flex-direction: column; flex: 1; }
+.tab-panel.active { display: flex; }
+
+/* ── Text Translation Panel ── */
+.translate-grid {
+  display: grid; grid-template-columns: 1fr 1fr;
+  flex: 1; overflow: hidden;
+}
+
+.pane {
+  display: flex; flex-direction: column;
+  border-right: 1px solid var(--border);
+  overflow: hidden;
+}
+.pane:last-child { border-right: none; }
+
+.pane-header {
+  padding: 12px 20px;
+  display: flex; align-items: center; justify-content: space-between;
+  border-bottom: 1px solid var(--border);
+  background: var(--panel2);
+}
+.pane-title {
+  font-family: var(--head); font-weight: 700; font-size: 13px;
+  letter-spacing: 0.15em; text-transform: uppercase; color: var(--text-dim);
+}
+.pane-actions { display: flex; gap: 6px; }
+
+textarea {
+  flex: 1; width: 100%; resize: none;
+  background: transparent; border: none; outline: none;
+  color: var(--text); font-family: var(--body); font-size: 15px;
+  line-height: 1.7; padding: 20px;
+  scrollbar-width: thin; scrollbar-color: var(--border2) transparent;
+}
+textarea::placeholder { color: var(--text-dim); font-style: italic; }
+
+.output-area {
+  flex: 1; padding: 20px;
+  font-size: 15px; line-height: 1.7; color: var(--text-bright);
+  overflow-y: auto;
+  scrollbar-width: thin; scrollbar-color: var(--border2) transparent;
+  position: relative;
+  white-space: pre-wrap;
+}
+.output-placeholder {
+  color: var(--text-dim); font-style: italic;
+}
+
+/* Translate action bar */
+.action-bar {
+  padding: 12px 20px;
+  border-top: 1px solid var(--border);
+  display: flex; align-items: center; gap: 10px;
+  background: var(--panel);
+}
+
+.btn {
+  padding: 9px 20px;
+  font-family: var(--head); font-weight: 700; font-size: 13px;
+  letter-spacing: 0.12em; text-transform: uppercase;
+  border: none; border-radius: var(--radius);
+  cursor: pointer; transition: all 0.15s; display: flex; align-items: center; gap: 8px;
+}
+.btn-primary {
+  background: var(--accent); color: var(--bg);
+  box-shadow: 0 0 16px rgba(0,212,255,0.3);
+}
+.btn-primary:hover { background: #33ddff; box-shadow: 0 0 24px rgba(0,212,255,0.5); }
+.btn-primary:disabled { opacity: 0.4; cursor: not-allowed; }
+
+.btn-secondary {
+  background: transparent; color: var(--text-dim);
+  border: 1px solid var(--border2);
+}
+.btn-secondary:hover { border-color: var(--accent); color: var(--accent); }
+
+.btn-danger {
+  background: transparent; color: var(--accent2);
+  border: 1px solid rgba(255,107,53,0.3);
+}
+.btn-danger:hover { border-color: var(--accent2); background: rgba(255,107,53,0.08); }
+
+.btn-sm {
+  padding: 5px 12px; font-size: 11px;
+}
+
+.char-count {
+  font-family: var(--mono); font-size: 11px; color: var(--text-dim); margin-left: auto;
+}
+
+/* ── STT Panel ── */
+.stt-panel {
+  flex: 1; display: flex; flex-direction: column;
+  align-items: center; justify-content: center; gap: 32px;
+  padding: 40px;
+}
+
+.mic-container { position: relative; display: flex; align-items: center; justify-content: center; }
+
+.mic-rings {
+  position: absolute;
+  width: 120px; height: 120px;
+  border-radius: 50%;
+  border: 1px solid var(--accent);
+  opacity: 0; transform: scale(0.8);
+}
+.mic-rings:nth-child(1) { animation: ring-out 2s ease-out infinite; }
+.mic-rings:nth-child(2) { animation: ring-out 2s ease-out 0.6s infinite; }
+.mic-rings:nth-child(3) { animation: ring-out 2s ease-out 1.2s infinite; }
+
+@keyframes ring-out {
+  0%   { opacity: 0.6; transform: scale(0.8); }
+  100% { opacity: 0; transform: scale(1.6); }
+}
+
+.mic-rings.inactive { animation: none !important; opacity: 0; }
+
+.mic-btn {
+  width: 80px; height: 80px; border-radius: 50%;
+  border: 2px solid var(--accent);
+  background: rgba(0,212,255,0.08);
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer; font-size: 28px;
+  transition: all 0.2s; z-index: 1;
+  box-shadow: var(--glow);
+}
+.mic-btn:hover { background: rgba(0,212,255,0.15); transform: scale(1.05); }
+.mic-btn.recording {
+  border-color: var(--accent2); background: rgba(255,107,53,0.12);
+  box-shadow: var(--glow2); animation: mic-pulse 1s ease-in-out infinite;
+}
+@keyframes mic-pulse {
+  0%,100% { transform: scale(1); }
+  50%      { transform: scale(1.05); }
+}
+
+.stt-transcription {
+  width: 100%; max-width: 600px;
+  min-height: 80px; padding: 16px 20px;
+  border: 1px solid var(--border2); border-radius: var(--radius);
+  background: var(--panel2); color: var(--text);
+  font-size: 15px; line-height: 1.7; font-style: italic;
+}
+
+.stt-info {
+  font-family: var(--mono); font-size: 11px; color: var(--text-dim);
+  letter-spacing: 0.08em; text-align: center;
+}
+
+.timer {
+  font-family: var(--mono); font-size: 32px; color: var(--accent2);
+  letter-spacing: 0.1em; display: none;
+}
+.timer.visible { display: block; }
+
+/* ── File Upload Panel ── */
+.file-panel {
+  flex: 1; display: flex; flex-direction: column;
+  padding: 24px 32px; gap: 20px;
+}
+
+.drop-zone {
+  border: 2px dashed var(--border2);
+  border-radius: 8px;
+  padding: 48px 24px;
+  text-align: center; cursor: pointer;
+  transition: all 0.2s;
+  background: var(--panel2);
+  flex-shrink: 0;
+}
+.drop-zone:hover, .drop-zone.dragover {
+  border-color: var(--accent); background: rgba(0,212,255,0.04);
+}
+.drop-icon { font-size: 40px; margin-bottom: 12px; }
+.drop-title {
+  font-family: var(--head); font-weight: 700; font-size: 16px;
+  letter-spacing: 0.1em; text-transform: uppercase; color: var(--text); margin-bottom: 6px;
+}
+.drop-sub { font-size: 13px; color: var(--text-dim); }
+.drop-input { display: none; }
+
+.file-info {
+  display: none; padding: 12px 16px;
+  border: 1px solid var(--border2); border-radius: var(--radius);
+  background: var(--panel2); align-items: center; gap: 12px;
+}
+.file-info.visible { display: flex; }
+.file-icon { font-size: 22px; }
+.file-name { font-family: var(--mono); font-size: 12px; color: var(--accent); }
+.file-size { font-family: var(--mono); font-size: 10px; color: var(--text-dim); }
+
+/* ── Summary Panel ── */
+.summary-panel {
+  flex: 1; display: flex; flex-direction: column;
+  overflow: hidden;
+}
+
+.summary-grid {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 1px; flex: 1; overflow-y: auto;
+  background: var(--border);
+}
+
+.summary-card {
+  padding: 20px 24px; background: var(--panel);
+}
+.summary-card-label {
+  font-family: var(--mono); font-size: 10px; letter-spacing: 0.2em;
+  text-transform: uppercase; color: var(--text-dim); margin-bottom: 10px;
+  display: flex; align-items: center; gap: 6px;
+}
+.summary-card-value {
+  font-size: 14px; color: var(--text-bright); line-height: 1.6;
+}
+.summary-card-value.empty { color: var(--text-dim); font-style: italic; }
+
+.badge {
+  padding: 2px 8px; border-radius: 3px;
+  font-family: var(--mono); font-size: 10px; font-weight: 600;
+  letter-spacing: 0.08em; text-transform: uppercase; display: inline-block;
+}
+.badge-critical { background: rgba(255,50,50,0.15); color: #ff5555; border: 1px solid rgba(255,50,50,0.3); }
+.badge-high     { background: rgba(255,107,53,0.15); color: var(--accent2); border: 1px solid rgba(255,107,53,0.3); }
+.badge-medium   { background: rgba(255,200,50,0.12); color: #ffc832; border: 1px solid rgba(255,200,50,0.3); }
+.badge-low      { background: rgba(57,255,140,0.1); color: var(--accent3); border: 1px solid rgba(57,255,140,0.3); }
+
+.tag-list { display: flex; flex-wrap: wrap; gap: 6px; }
+.tag {
+  padding: 3px 10px; border: 1px solid var(--border2);
+  border-radius: 3px; font-size: 12px; color: var(--text);
+  font-family: var(--mono); font-size: 11px;
+}
+
+.summary-empty {
+  flex: 1; display: flex; flex-direction: column;
+  align-items: center; justify-content: center; gap: 16px;
+  color: var(--text-dim);
+}
+.summary-empty-icon { font-size: 48px; opacity: 0.3; }
+.summary-empty-text { font-family: var(--mono); font-size: 12px; letter-spacing: 0.1em; }
+
+/* ── Loading state ── */
+.loading-bar {
+  height: 2px; background: var(--border);
+  position: relative; overflow: hidden;
+}
+.loading-bar::after {
+  content: ''; position: absolute; top: 0; left: -60%;
+  width: 60%; height: 100%;
+  background: linear-gradient(90deg, transparent, var(--accent), transparent);
+  animation: loading-sweep 1.2s ease-in-out infinite;
+}
+@keyframes loading-sweep { to { left: 100%; } }
+.loading-bar.hidden { display: none; }
+
+/* ── Toast ── */
+.toast-container {
+  position: fixed; bottom: 24px; right: 24px; z-index: 999;
+  display: flex; flex-direction: column; gap: 8px; pointer-events: none;
+}
+.toast {
+  padding: 10px 18px;
+  background: var(--panel2); border: 1px solid var(--border2);
+  border-left: 3px solid var(--accent3);
+  font-size: 13px; color: var(--text);
+  box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+  animation: toast-in 0.25s ease; pointer-events: auto;
+}
+.toast.error { border-left-color: var(--accent2); }
+@keyframes toast-in { from { opacity:0; transform:translateY(10px); } to { opacity:1; transform:none; } }
+
+/* ── Scrollbar global ── */
+::-webkit-scrollbar { width: 4px; height: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
+::-webkit-scrollbar-thumb:hover { background: var(--text-dim); }
+
+/* ── Responsive ── */
+@media (max-width: 900px) {
+  main { grid-template-columns: 1fr; }
+  aside { display: none; }
+  .translate-grid { grid-template-columns: 1fr; }
+}
+
+/* ── Typing cursor ── */
+.typing::after {
+  content: '▋'; color: var(--accent);
+  animation: blink 0.8s step-end infinite;
+}
+
+/* ── Python command helper ── */
+.cmd-box {
+  background: var(--panel2); border: 1px solid var(--border2);
+  border-left: 3px solid var(--accent2); border-radius: var(--radius);
+  padding: 10px 14px; font-family: var(--mono); font-size: 12px;
+  color: var(--text-dim); margin-top: auto;
+}
+.cmd-box span { color: var(--accent2); }
+
+</style>
+</head>
+<body>
+<div class="app">
+
+<!-- ── HEADER ── -->
+<header>
+  <div class="logo">
+    <div class="logo-badge">HADR</div>
+    <div class="logo-text">
+      <div class="logo-title">HADR Translator</div>
+      <div class="logo-sub">Operational Intelligence Platform</div>
+    </div>
+  </div>
+  <div class="header-status">
+    <div class="status-dot" id="statusDot"></div>
+    <span id="statusText">SYSTEM READY</span>
+  </div>
+</header>
+
+<!-- ── MAIN ── -->
+<main>
+
+  <!-- Mode Tabs -->
+  <div class="mode-tabs" role="tablist">
+    <div class="tab active" data-tab="text" role="tab"><span class="tab-icon">⌨</span> Text-to-Text</div>
+    <div class="tab" data-tab="stt"  role="tab"><span class="tab-icon">🎙</span> Voice (STT)</div>
+    <div class="tab" data-tab="file" role="tab"><span class="tab-icon">📄</span> File Upload</div>
+    <div class="tab" data-tab="sum"  role="tab"><span class="tab-icon">◈</span> HADR Summary</div>
+  </div>
+
+  <!-- ── SIDEBAR ── -->
+  <aside>
+    <div>
+      <div class="section-label">Source Language</div>
+      <div class="lang-grid" id="langGrid">
+        <button class="lang-btn active" data-lang="ms">🇲🇾 MS</button>
+        <button class="lang-btn" data-lang="zh">🇨🇳 ZH</button>
+        <button class="lang-btn" data-lang="id">🇮🇩 ID</button>
+        <button class="lang-btn" data-lang="tl">🇵🇭 TL</button>
+        <button class="lang-btn" data-lang="th">🇹🇭 TH</button>
+        <button class="lang-btn" data-lang="my">🇲🇲 MY</button>
+        <button class="lang-btn" data-lang="lo">🇱🇦 LO</button>
+        <button class="lang-btn" data-lang="hi">🇮🇳 HI</button>
+        <button class="lang-btn" data-lang="ko">🇰🇷 KO</button>
+        <button class="lang-btn" data-lang="ja">🇯🇵 JA</button>
+        <button class="lang-btn" data-lang="fr">🇫🇷 FR</button>
+        <button class="lang-btn" data-lang="vi">🇻🇳 VI</button>
+      </div>
+    </div>
+
+    <div>
+      <div class="section-label">Options</div>
+      <div class="option-row">
+        <div>
+          <div class="option-label">Auto Summary</div>
+          <div class="option-sub">Extract HADR key points</div>
+        </div>
+        <div class="toggle" id="toggleSummary" role="switch" aria-checked="false"></div>
+      </div>
+      <div class="option-row">
+        <div>
+          <div class="option-label">Stream Output</div>
+          <div class="option-sub">Typewriter effect</div>
+        </div>
+        <div class="toggle on" id="toggleStream" role="switch" aria-checked="true"></div>
+      </div>
+      <div class="option-row">
+        <div>
+          <div class="option-label">Auto-Detect Lang</div>
+          <div class="option-sub">Override language selection</div>
+        </div>
+        <div class="toggle" id="toggleAutoLang" role="switch" aria-checked="false"></div>
+      </div>
+    </div>
+
+    <div>
+      <div class="section-label">Session Metrics</div>
+      <div class="metrics">
+        <div class="metric"><span class="metric-label">Translations</span><span class="metric-value" id="metCount">0</span></div>
+        <div class="metric"><span class="metric-label">Summaries</span><span class="metric-value" id="metSummaries">0</span></div>
+        <div class="metric"><span class="metric-label">Voice clips</span><span class="metric-value" id="metVoice">0</span></div>
+        <div class="metric"><span class="metric-label">Files processed</span><span class="metric-value" id="metFiles">0</span></div>
+      </div>
+    </div>
+
+    <div>
+      <div class="section-label">Recent Translations</div>
+      <div class="history-list" id="historyList">
+        <div style="font-family:var(--mono);font-size:11px;color:var(--text-dim)">No history yet.</div>
+      </div>
+    </div>
+
+    <!-- CLI helper -->
+    <div class="cmd-box">
+      <div style="margin-bottom:6px;color:var(--text-dim)">Run backend:</div>
+      <span>python</span> Summary.py<br>
+      &nbsp;&nbsp;--model_dir ./checkpoints/final<br>
+      &nbsp;&nbsp;<span>[--summarise]</span>
+    </div>
+  </aside>
+
+  <!-- ── CONTENT ── -->
+  <div class="content">
+
+    <!-- Loading bar -->
+    <div class="loading-bar hidden" id="loadingBar"></div>
+
+    <!-- ══ TAB: TEXT-TO-TEXT ══ -->
+    <div class="tab-panel active" id="panel-text">
+      <div class="translate-grid">
+        <!-- Source -->
+        <div class="pane">
+          <div class="pane-header">
+            <div class="pane-title" id="sourceLangLabel">Malay (MS)</div>
+            <div class="pane-actions">
+              <button class="btn btn-secondary btn-sm" id="clearSource" title="Clear">✕ Clear</button>
+              <button class="btn btn-secondary btn-sm" id="pasteBtn" title="Paste from clipboard">⎘ Paste</button>
+            </div>
+          </div>
+          <textarea id="sourceText"
+            placeholder="Enter HADR text here… e.g. Operasi SAR di kawasan banjir kilat sedang dijalankan."
+            maxlength="5000"></textarea>
+          <div class="action-bar">
+            <button class="btn btn-primary" id="translateBtn">⟶ Translate</button>
+            <button class="btn btn-secondary btn-sm" id="exampleBtn">Load Example</button>
+            <span class="char-count"><span id="charCount">0</span> / 5000</span>
+          </div>
+        </div>
+
+        <!-- Output -->
+        <div class="pane">
+          <div class="pane-header">
+            <div class="pane-title">English (Target)</div>
+            <div class="pane-actions">
+              <button class="btn btn-secondary btn-sm" id="copyBtn" title="Copy">⎘ Copy</button>
+              <button class="btn btn-secondary btn-sm" id="exportBtn" title="Export">↓ Export</button>
+            </div>
+          </div>
+          <div class="output-area" id="outputArea">
+            <span class="output-placeholder">Translation will appear here…</span>
+          </div>
+          <div class="action-bar">
+            <button class="btn btn-secondary btn-sm" id="summariseBtn" style="display:none">◈ Extract Summary</button>
+            <span class="char-count" id="outputCharCount"></span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══ TAB: STT ══ -->
+    <div class="tab-panel" id="panel-stt">
+      <div class="stt-panel">
+        <div style="text-align:center">
+          <div style="font-family:var(--head);font-weight:900;font-size:28px;letter-spacing:0.15em;color:var(--text-bright);text-transform:uppercase">Voice Input</div>
+          <div style="font-family:var(--mono);font-size:11px;color:var(--text-dim);margin-top:6px;letter-spacing:0.1em">SPEAK YOUR HADR OPERATIONAL TEXT</div>
+        </div>
+
+        <div class="mic-container">
+          <div class="mic-rings inactive" id="ring1"></div>
+          <div class="mic-rings inactive" id="ring2"></div>
+          <div class="mic-rings inactive" id="ring3"></div>
+          <div class="mic-btn" id="micBtn" title="Click to record">🎙</div>
+        </div>
+
+        <div class="timer" id="timer">00:00</div>
+
+        <div class="stt-info" id="sttInfo">Click the microphone to start recording</div>
+
+        <div style="width:100%;max-width:600px">
+          <div class="section-label">Transcription</div>
+          <div class="stt-transcription" id="sttTranscription">Transcription will appear here…</div>
+        </div>
+
+        <div style="width:100%;max-width:600px">
+          <div class="section-label">English Translation</div>
+          <div class="stt-transcription" id="sttTranslation" style="font-style:normal;color:var(--text-bright)">—</div>
+        </div>
+
+        <div style="display:flex;gap:10px">
+          <button class="btn btn-primary" id="sttTranslateBtn" disabled>⟶ Translate Transcription</button>
+          <button class="btn btn-secondary btn-sm" id="sttClearBtn">✕ Clear</button>
+        </div>
+
+        <div style="font-family:var(--mono);font-size:10px;color:var(--text-dim);text-align:center;max-width:400px;line-height:1.7">
+          Using <code style="color:var(--accent3)">Whisper</code> for offline transcription.<br>
+          Start server with <code style="color:var(--accent2)">--whisper medium</code> to enable.
+        </div>
+      </div>
+    </div>
+
+    <!-- ══ TAB: FILE UPLOAD ══ -->
+    <div class="tab-panel" id="panel-file">
+      <div class="file-panel">
+        <div class="drop-zone" id="dropZone">
+          <div class="drop-icon">📂</div>
+          <div class="drop-title">Drop HADR document here</div>
+          <div class="drop-sub">Supports .txt, .jsonl, .json — or click to browse</div>
+          <input type="file" class="drop-input" id="fileInput" accept=".txt,.jsonl,.json,.csv">
+        </div>
+
+        <div class="file-info" id="fileInfo">
+          <div class="file-icon">📄</div>
+          <div>
+            <div class="file-name" id="fileName">—</div>
+            <div class="file-size" id="fileSize">—</div>
+          </div>
+          <button class="btn btn-danger btn-sm" id="clearFile" style="margin-left:auto">Remove</button>
+        </div>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;flex:1;overflow:hidden">
+          <div style="display:flex;flex-direction:column;gap:8px;overflow:hidden">
+            <div class="section-label">File Contents Preview</div>
+            <div class="output-area" id="filePreview" style="border:1px solid var(--border);flex:1;font-family:var(--mono);font-size:12px">
+              <span class="output-placeholder">File preview will appear here…</span>
+            </div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:8px;overflow:hidden">
+            <div class="section-label">Translations</div>
+            <div class="output-area" id="fileTranslations" style="border:1px solid var(--border);flex:1">
+              <span class="output-placeholder">Translated content will appear here…</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="action-bar" style="border-top:1px solid var(--border);padding:12px 0 0;margin-top:0">
+          <button class="btn btn-primary" id="fileTranslateBtn" disabled>⟶ Translate File</button>
+          <button class="btn btn-secondary btn-sm" id="fileExportBtn" disabled>↓ Export Results</button>
+          <span class="char-count" id="fileStats"></span>
+        </div>
+
+        <div style="font-family:var(--mono);font-size:10px;color:var(--text-dim);line-height:1.8">
+          For production batch translation, use:<br>
+          <code style="color:var(--accent2)">python Summary.py --model_dir ./checkpoints/final --input your_file.jsonl --output results.jsonl [--summarise]</code>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══ TAB: SUMMARY ══ -->
+    <div class="tab-panel" id="panel-sum">
+      <div class="summary-panel">
+        <div class="action-bar" style="border-bottom:1px solid var(--border)">
+          <button class="btn btn-primary" id="sumExtractBtn" disabled>◈ Extract Key Points</button>
+          <button class="btn btn-secondary btn-sm" id="sumClearBtn">✕ Clear</button>
+          <button class="btn btn-secondary btn-sm" id="sumExportBtn" disabled>↓ Export JSON</button>
+          <span style="margin-left:auto;font-family:var(--mono);font-size:11px;color:var(--text-dim)" id="sumStatus">No translation loaded</span>
+        </div>
+
+        <div id="summaryEmpty" class="summary-empty">
+          <div class="summary-empty-icon">◈</div>
+          <div class="summary-empty-text">Translate text first, then extract HADR key points</div>
+          <button class="btn btn-secondary btn-sm" onclick="switchTab('text')">Go to Translator</button>
+        </div>
+
+        <div class="summary-grid" id="summaryGrid" style="display:none">
+          <div class="summary-card">
+            <div class="summary-card-label">⚡ Incident Type</div>
+            <div class="summary-card-value" id="sum-incident">—</div>
+          </div>
+          <div class="summary-card">
+            <div class="summary-card-label">📍 Location</div>
+            <div class="summary-card-value" id="sum-location">—</div>
+          </div>
+          <div class="summary-card">
+            <div class="summary-card-label">🔄 Operational Status</div>
+            <div class="summary-card-value" id="sum-status">—</div>
+          </div>
+          <div class="summary-card">
+            <div class="summary-card-label">🚨 Urgency Level</div>
+            <div class="summary-card-value" id="sum-urgency">—</div>
+          </div>
+          <div class="summary-card">
+            <div class="summary-card-label">👥 Affected Population</div>
+            <div class="summary-card-value" id="sum-population">—</div>
+          </div>
+          <div class="summary-card">
+            <div class="summary-card-label">📡 Comms Status</div>
+            <div class="summary-card-value" id="sum-comms">—</div>
+          </div>
+          <div class="summary-card" style="grid-column:1/-1">
+            <div class="summary-card-label">⚙ Key Actions</div>
+            <div class="tag-list" id="sum-actions"></div>
+          </div>
+          <div class="summary-card">
+            <div class="summary-card-label">🛠 Resources Involved</div>
+            <div class="tag-list" id="sum-resources"></div>
+          </div>
+          <div class="summary-card">
+            <div class="summary-card-label">🆘 Immediate Needs</div>
+            <div class="tag-list" id="sum-needs"></div>
+          </div>
+          <div class="summary-card" style="grid-column:1/-1">
+            <div class="summary-card-label">📋 Additional Notes</div>
+            <div class="summary-card-value" id="sum-notes">—</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /content -->
+</main>
+</div>
+
+<!-- Toast container -->
+<div class="toast-container" id="toasts"></div>
+
+<script>
+// ─────────────────────────────────────────────────────────────
+// State
+// ─────────────────────────────────────────────────────────────
+const state = {
+  selectedLang: 'ms',
+  autoSummary:  false,
+  streamOutput: true,
+  autoDetect:   false,
+  currentTranslation: '',
+  currentSource: '',
+  metrics: { translations: 0, summaries: 0, voice: 0, files: 0 },
+  history: [],
+  recording: false,
+  mediaRecorder: null,
+  recordTimer: null,
+  recordSeconds: 0,
+  recognition: null,
+  fileRecords: [],
+  lastSummary: null,
+};
+
+const LANG_LABELS = {
+  ms:'Malay (MS)',zh:'Chinese (ZH)',id:'Indonesian (ID)',tl:'Tagalog (TL)',
+  th:'Thai (TH)',my:'Burmese (MY)',lo:'Lao (LO)',hi:'Hindi (HI)',
+  ko:'Korean (KO)',ja:'Japanese (JA)',fr:'French (FR)',vi:'Vietnamese (VI)'
+};
+
+const LANG_FULL = {
+  ms:'Malay',zh:'Chinese',id:'Indonesian',tl:'Filipino',th:'Thai',
+  my:'Burmese',lo:'Lao',hi:'Hindi',ko:'Korean',ja:'Japanese',fr:'French',vi:'Vietnamese'
+};
+
+const EXAMPLES = {
+  ms:"Operasi SAR di kawasan banjir kilat sedang dijalankan oleh pasukan SMART.",
+  zh:"搜救队正在地震废墟中寻找幸存者。",
+  id:"Tim SAR sedang melakukan operasi pencarian dan penyelamatan di daerah banjir.",
+  tl:"Ang mga operasyon ng SAR ay isinasagawa sa lugar ng lindol.",
+  th:"ทีมค้นหาและกู้ภัยกำลังดำเนินการในพื้นที่ที่ได้รับผลกระทบจากน้ำท่วม",
+  my:"ကယ်ဆယ်ရေးအဖွဲ့သည် ရေကြီးသည့်ဒေသတွင် ကယ်ဆယ်ရေးလုပ်ငန်းများ ဆောင်ရွက်လျက်ရှိသည်။",
+  lo:"ທີມຊອກຫາແລະຊ່ວຍເຫຼືອກຳລັງດຳເນີນງານໃນພື້ນທີ່ຖ້ວມນ້ຳ",
+  hi:"SAR टीम बाढ़ प्रभावित क्षेत्र में खोज और बचाव अभियान चला रही है।",
+  ko:"SAR 팀이 홍수 피해 지역에서 수색 구조 작전을 수행하고 있습니다.",
+  ja:"SARチームが洪水被災地域で捜索救助活動を行っています。",
+  fr:"L'équipe SAR mène des opérations de recherche et de sauvetage dans la zone sinistrée.",
+  vi:"Đội SAR đang tiến hành các hoạt động tìm kiếm cứu nạn ở vùng lũ lụt.",
+};
+
+// ─────────────────────────────────────────────────────────────
+// API: calls to backend (Summary.py / inference server)
+// ─────────────────────────────────────────────────────────────
+
+const API_BASE = 'http://localhost:5000'; // adjust to your backend port
+
+async function apiTranslate(text, lang) {
+  const res = await fetch(`${API_BASE}/translate`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ source_text: text, source_lang: lang })
+  });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  const data = await res.json();
+  return data.translation;
+}
+
+async function apiSummarise(text) {
+  const res = await fetch(`${API_BASE}/summarise`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ text })
+  });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return await res.json();
+}
+
+// Demo mode: mock responses when backend is offline
+async function mockTranslate(text, lang) {
+  await sleep(600 + Math.random() * 800);
+  const mocks = {
+    ms:"SAR operations in the flash flood area are being conducted by the SMART team.",
+    zh:"The search and rescue team is searching for survivors in the earthquake rubble.",
+    id:"The SAR team is conducting search and rescue operations in the flood-affected area.",
+    tl:"SAR operations are being carried out in the earthquake-affected area.",
+    th:"The search and rescue team is conducting operations in the flood-affected area.",
+    my:"The rescue team is conducting rescue operations in the flooded area.",
+    lo:"The search and rescue team is conducting operations in the flood-affected area.",
+    hi:"The SAR team is conducting search and rescue operations in the flood-affected area.",
+    ko:"The SAR team is conducting search and rescue operations in the flood-affected area.",
+    ja:"The SAR team is conducting search and rescue operations in the flood-affected area.",
+    fr:"The SAR team is conducting search and rescue operations in the affected area.",
+    vi:"The SAR team is conducting search and rescue operations in the flood-affected area.",
+  };
+  return mocks[lang] || "[Translation — connect backend at localhost:5000 to enable live translation]";
+}
+
+async function mockSummarise(text) {
+  await sleep(800);
+  return {
+    incident_type: "Flood / Natural Disaster",
+    location: "Flash flood zone (exact area unspecified)",
+    operational_status: "response",
+    key_actions: ["SAR operations underway","Area assessment ongoing","Victim extraction"],
+    resources_involved: ["SMART Team","SAR Unit","Field Medical"],
+    affected_population: "Unspecified — assessment in progress",
+    urgency_level: "high",
+    immediate_needs: ["Clean water","Medical supplies","Evacuation transport"],
+    communication_status: "Operational",
+    additional_notes: "Joint multi-agency response activated"
+  };
+}
+
+async function callTranslate(text, lang) {
+  try { return await apiTranslate(text, lang); }
+  catch { return await mockTranslate(text, lang); }
+}
+
+async function callSummarise(text) {
+  try { return await apiSummarise(text); }
+  catch { return await mockSummarise(text); }
+}
+
+// ─────────────────────────────────────────────────────────────
+// Utilities
+// ─────────────────────────────────────────────────────────────
+
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+function showLoading() { document.getElementById('loadingBar').classList.remove('hidden'); }
+function hideLoading() { document.getElementById('loadingBar').classList.add('hidden'); }
+
+function setStatus(text, active=true) {
+  document.getElementById('statusText').textContent = text;
+  document.getElementById('statusDot').style.background = active ? 'var(--accent3)' : 'var(--accent2)';
+}
+
+function toast(msg, type='') {
+  const t = document.createElement('div');
+  t.className = 'toast' + (type ? ' ' + type : '');
+  t.textContent = msg;
+  document.getElementById('toasts').appendChild(t);
+  setTimeout(() => t.remove(), 3500);
+}
+
+function updateMetrics() {
+  document.getElementById('metCount').textContent = state.metrics.translations;
+  document.getElementById('metSummaries').textContent = state.metrics.summaries;
+  document.getElementById('metVoice').textContent = state.metrics.voice;
+  document.getElementById('metFiles').textContent = state.metrics.files;
+}
+
+function addHistory(lang, source, translation) {
+  state.history.unshift({ lang, source, translation });
+  if (state.history.length > 8) state.history.pop();
+  renderHistory();
+}
+
+function renderHistory() {
+  const el = document.getElementById('historyList');
+  if (!state.history.length) {
+    el.innerHTML = '<div style="font-family:var(--mono);font-size:11px;color:var(--text-dim)">No history yet.</div>';
+    return;
+  }
+  el.innerHTML = state.history.map((h, i) => `
+    <div class="history-item" data-idx="${i}">
+      <div class="hist-lang">${LANG_LABELS[h.lang]}</div>
+      ${h.source.slice(0, 60)}…
+    </div>
+  `).join('');
+  el.querySelectorAll('.history-item').forEach(el => {
+    el.addEventListener('click', () => {
+      const h = state.history[+el.dataset.idx];
+      document.getElementById('sourceText').value = h.source;
+      document.getElementById('charCount').textContent = h.source.length;
+      typewriterOutput(h.translation);
+      switchTab('text');
+    });
+  });
+}
+
+function typewriterOutput(text, el=document.getElementById('outputArea')) {
+  if (!state.streamOutput) { el.textContent = text; return; }
+  el.textContent = '';
+  el.classList.add('typing');
+  let i = 0;
+  const interval = setInterval(() => {
+    el.textContent += text[i++];
+    if (i >= text.length) { clearInterval(interval); el.classList.remove('typing'); }
+  }, 18);
+}
+
+// ─────────────────────────────────────────────────────────────
+// Tab Switching
+// ─────────────────────────────────────────────────────────────
+
+function switchTab(name) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.tab === name));
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.toggle('active', p.id === 'panel-' + name));
+}
+
+document.querySelectorAll('.tab').forEach(t => {
+  t.addEventListener('click', () => switchTab(t.dataset.tab));
+});
+
+// ─────────────────────────────────────────────────────────────
+// Language Selection
+// ─────────────────────────────────────────────────────────────
+
+document.getElementById('langGrid').addEventListener('click', e => {
+  const btn = e.target.closest('.lang-btn');
+  if (!btn) return;
+  document.querySelectorAll('.lang-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  state.selectedLang = btn.dataset.lang;
+  document.getElementById('sourceLangLabel').textContent = LANG_LABELS[state.selectedLang];
+});
+
+// ─────────────────────────────────────────────────────────────
+// Toggles
+// ─────────────────────────────────────────────────────────────
+
+function bindToggle(id, stateKey, onChange) {
+  const el = document.getElementById(id);
+  el.addEventListener('click', () => {
+    state[stateKey] = !state[stateKey];
+    el.classList.toggle('on', state[stateKey]);
+    el.setAttribute('aria-checked', state[stateKey]);
+    if (onChange) onChange(state[stateKey]);
+  });
+}
+
+bindToggle('toggleSummary',  'autoSummary',  v => {
+  document.getElementById('summariseBtn').style.display = state.currentTranslation && v ? '' : 'none';
+});
+bindToggle('toggleStream',   'streamOutput', null);
+bindToggle('toggleAutoLang', 'autoDetect',   null);
+
+// ─────────────────────────────────────────────────────────────
+// TEXT-TO-TEXT Translation
+// ─────────────────────────────────────────────────────────────
+
+const sourceText = document.getElementById('sourceText');
+const outputArea = document.getElementById('outputArea');
+
+sourceText.addEventListener('input', () => {
+  document.getElementById('charCount').textContent = sourceText.value.length;
+});
+
+document.getElementById('clearSource').addEventListener('click', () => {
+  sourceText.value = '';
+  document.getElementById('charCount').textContent = 0;
+});
+
+document.getElementById('pasteBtn').addEventListener('click', async () => {
+  try {
+    const text = await navigator.clipboard.readText();
+    sourceText.value = text;
+    document.getElementById('charCount').textContent = text.length;
+  } catch { toast('Clipboard access denied', 'error'); }
+});
+
+document.getElementById('exampleBtn').addEventListener('click', () => {
+  const ex = EXAMPLES[state.selectedLang] || EXAMPLES.ms;
+  sourceText.value = ex;
+  document.getElementById('charCount').textContent = ex.length;
+});
+
+document.getElementById('copyBtn').addEventListener('click', () => {
+  if (!state.currentTranslation) return;
+  navigator.clipboard.writeText(state.currentTranslation).then(() => toast('Copied to clipboard ✓'));
+});
+
+document.getElementById('exportBtn').addEventListener('click', () => {
+  if (!state.currentTranslation) return;
+  const blob = new Blob([JSON.stringify({
+    source_lang: state.selectedLang,
+    source_text: state.currentSource,
+    target_text: state.currentTranslation,
+    timestamp: new Date().toISOString()
+  }, null, 2)], {type:'application/json'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `hadr_translation_${Date.now()}.json`;
+  a.click();
+});
+
+document.getElementById('summariseBtn').addEventListener('click', () => runSummary(state.currentTranslation));
+
+document.getElementById('translateBtn').addEventListener('click', async () => {
+  const text = sourceText.value.trim();
+  if (!text) { toast('Please enter source text', 'error'); return; }
+  await doTranslate(text, state.selectedLang);
+});
+
+async function doTranslate(text, lang) {
+  showLoading();
+  setStatus('TRANSLATING…');
+  document.getElementById('translateBtn').disabled = true;
+  outputArea.innerHTML = '<span class="output-placeholder">Translating…</span>';
+
+  try {
+    const result = await callTranslate(text, lang);
+    state.currentTranslation = result;
+    state.currentSource = text;
+    typewriterOutput(result);
+
+    state.metrics.translations++;
+    updateMetrics();
+    addHistory(lang, text, result);
+
+    document.getElementById('outputCharCount').textContent = `${result.length} chars`;
+    document.getElementById('sumExtractBtn').disabled = false;
+    document.getElementById('sumStatus').textContent = 'Translation loaded';
+
+    const sumBtn = document.getElementById('summariseBtn');
+    sumBtn.style.display = state.autoSummary ? '' : 'none';
+
+    if (state.autoSummary) await runSummary(result);
+
+    setStatus('SYSTEM READY');
+    toast('Translation complete ✓');
+
+  } catch(e) {
+    outputArea.textContent = 'Error: ' + e.message;
+    setStatus('ERROR', false);
+    toast('Translation failed: ' + e.message, 'error');
+  } finally {
+    hideLoading();
+    document.getElementById('translateBtn').disabled = false;
+  }
+}
+
+// ─────────────────────────────────────────────────────────────
+// Summary Rendering
+// ─────────────────────────────────────────────────────────────
+
+async function runSummary(text) {
+  if (!text) return;
+  showLoading();
+  setStatus('EXTRACTING KEY POINTS…');
+
+  try {
+    const summary = await callSummarise(text);
+    state.lastSummary = summary;
+    renderSummary(summary);
+    state.metrics.summaries++;
+    updateMetrics();
+    document.getElementById('sumExportBtn').disabled = false;
+    setStatus('SYSTEM READY');
+    toast('Summary extracted ✓');
+    switchTab('sum');
+  } catch(e) {
+    toast('Summary failed: ' + e.message, 'error');
+    setStatus('ERROR', false);
+  } finally {
+    hideLoading();
+  }
+}
+
+function renderSummary(s) {
+  const empty = document.getElementById('summaryEmpty');
+  const grid  = document.getElementById('summaryGrid');
+  empty.style.display = 'none';
+  grid.style.display  = 'grid';
+
+  function set(id, val, fallback='—') {
+    const el = document.getElementById(id);
+    if (!val) { el.textContent = fallback; el.className = 'summary-card-value empty'; return; }
+    el.textContent = val;
+    el.className = 'summary-card-value';
+  }
+
+  set('sum-incident',    s.incident_type);
+  set('sum-location',    s.location);
+  set('sum-status',      s.operational_status);
+  set('sum-population',  s.affected_population);
+  set('sum-comms',       s.communication_status);
+  set('sum-notes',       s.additional_notes);
+
+  // Urgency badge
+  const urgencyEl = document.getElementById('sum-urgency');
+  if (s.urgency_level) {
+    const lvl = s.urgency_level.toLowerCase();
+    urgencyEl.innerHTML = `<span class="badge badge-${lvl}">${s.urgency_level}</span>`;
+  } else {
+    urgencyEl.textContent = '—';
+  }
+
+  // Tag lists
+  function setTags(id, arr) {
+    const el = document.getElementById(id);
+    if (!arr || !arr.length) { el.innerHTML = '<span class="summary-card-value empty">—</span>'; return; }
+    el.innerHTML = arr.map(a => `<span class="tag">${a}</span>`).join('');
+  }
+
+  setTags('sum-actions',   s.key_actions);
+  setTags('sum-resources', s.resources_involved);
+  setTags('sum-needs',     s.immediate_needs);
+}
+
+document.getElementById('sumExtractBtn').addEventListener('click', () => {
+  if (state.currentTranslation) runSummary(state.currentTranslation);
+});
+
+document.getElementById('sumClearBtn').addEventListener('click', () => {
+  document.getElementById('summaryEmpty').style.display = '';
+  document.getElementById('summaryGrid').style.display = 'none';
+  document.getElementById('sumExportBtn').disabled = true;
+  state.lastSummary = null;
+});
+
+document.getElementById('sumExportBtn').addEventListener('click', () => {
+  if (!state.lastSummary) return;
+  const blob = new Blob([JSON.stringify(state.lastSummary, null, 2)], {type:'application/json'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `hadr_summary_${Date.now()}.json`;
+  a.click();
+});
+
+// ─────────────────────────────────────────────────────────────
+// STT — Web Speech API
+// ─────────────────────────────────────────────────────────────
+
+const micBtn          = document.getElementById('micBtn');
+const timerEl         = document.getElementById('timer');
+const sttInfo         = document.getElementById('sttInfo');
+const sttTranscription= document.getElementById('sttTranscription');
+const sttTranslation  = document.getElementById('sttTranslation');
+const sttTranslateBtn = document.getElementById('sttTranslateBtn');
+const rings           = [document.getElementById('ring1'),document.getElementById('ring2'),document.getElementById('ring3')];
+
+micBtn.addEventListener('click', () => {
+  if (!speechRecognition) {
+    toast('Web Speech API not supported — use Chrome/Edge', 'error');
+    return;
+  }
+  if (!state.recording) startRecording();
+  else stopRecording();
+});
+
+// Replace startRecording() and stopRecording() with:
+
+let mediaStream = null;
+let audioChunks = [];
+
+async function startRecording() {
+  try {
+    mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+  } catch(e) {
+    toast('Microphone access denied', 'error'); return;
+  }
+
+  state.recording = true;
+  state.recordSeconds = 0;
+  audioChunks = [];
+
+  const recorder = new MediaRecorder(mediaStream, { mimeType: 'audio/webm' });
+  state.mediaRecorder = recorder;
+
+  recorder.ondataavailable = e => { if (e.data.size > 0) audioChunks.push(e.data); };
+  recorder.onstop = async () => {
+    const blob = new Blob(audioChunks, { type: 'audio/webm' });
+    await sendAudioToWhisper(blob);
+  };
+
+  recorder.start();
+  micBtn.classList.add('recording');
+  micBtn.textContent = '⏹';
+  rings.forEach(r => r.classList.remove('inactive'));
+  timerEl.classList.add('visible');
+  sttInfo.textContent = 'Recording… Click ⏹ to stop';
+  sttTranscription.textContent = 'Listening…';
+  state.metrics.voice++;
+  updateMetrics();
+
+  state.recordTimer = setInterval(() => {
+    state.recordSeconds++;
+    const m = String(Math.floor(state.recordSeconds/60)).padStart(2,'0');
+    const s = String(state.recordSeconds%60).padStart(2,'0');
+    timerEl.textContent = `${m}:${s}`;
+  }, 1000);
+}
+
+function stopRecording() {
+  state.recording = false;
+  clearInterval(state.recordTimer);
+  state.mediaRecorder?.stop();
+  mediaStream?.getTracks().forEach(t => t.stop());
+  micBtn.classList.remove('recording');
+  micBtn.textContent = '🎙';
+  rings.forEach(r => r.classList.add('inactive'));
+  timerEl.classList.remove('visible');
+  sttInfo.textContent = 'Processing with Whisper…';
+}
+
+async function sendAudioToWhisper(blob) {
+  showLoading();
+  sttTranscription.textContent = 'Transcribing with Whisper…';
+  try {
+    const form = new FormData();
+    form.append('audio', blob, 'recording.webm');
+    form.append('source_lang', state.selectedLang);
+
+    const res = await fetch(`${API_BASE}/transcribe`, { method: 'POST', body: form });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+
+    sttTranscription.textContent = data.transcript;
+    sttTranslateBtn.disabled = false;
+    sttInfo.textContent = 'Transcription complete. Ready to translate.';
+    toast('Whisper transcription complete ✓');
+  } catch(e) {
+    sttTranscription.textContent = 'Transcription failed: ' + e.message;
+    sttInfo.textContent = 'Error — is --whisper flag set on the server?';
+    toast('Transcription failed: ' + e.message, 'error');
+  } finally { hideLoading(); }
+}
+
+// ─────────────────────────────────────────────────────────────
+// File Upload
+// ─────────────────────────────────────────────────────────────
+
+const dropZone       = document.getElementById('dropZone');
+const fileInput      = document.getElementById('fileInput');
+const fileInfo       = document.getElementById('fileInfo');
+const filePreview    = document.getElementById('filePreview');
+const fileTranslations=document.getElementById('fileTranslations');
+const fileTranslateBtn=document.getElementById('fileTranslateBtn');
+const fileExportBtn  = document.getElementById('fileExportBtn');
+
+dropZone.addEventListener('click', () => fileInput.click());
+dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('dragover'); });
+dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
+dropZone.addEventListener('drop', e => {
+  e.preventDefault(); dropZone.classList.remove('dragover');
+  const file = e.dataTransfer.files[0];
+  if (file) handleFile(file);
+});
+fileInput.addEventListener('change', () => {
+  if (fileInput.files[0]) handleFile(fileInput.files[0]);
+});
+document.getElementById('clearFile').addEventListener('click', () => {
+  fileInfo.classList.remove('visible');
+  filePreview.innerHTML = '<span class="output-placeholder">File preview will appear here…</span>';
+  fileTranslations.innerHTML = '<span class="output-placeholder">Translated content will appear here…</span>';
+  fileTranslateBtn.disabled = true;
+  fileExportBtn.disabled = true;
+  state.fileRecords = [];
+  document.getElementById('fileStats').textContent = '';
+});
+
+function handleFile(file) {
+  document.getElementById('fileName').textContent = file.name;
+  document.getElementById('fileSize').textContent = (file.size/1024).toFixed(1) + ' KB';
+  fileInfo.classList.add('visible');
+
+  const reader = new FileReader();
+  reader.onload = e => {
+    const text = e.target.result;
+    let records = [];
+
+    if (file.name.endsWith('.jsonl') || file.name.endsWith('.json')) {
+      const lines = text.trim().split('\n');
+      lines.forEach((line, i) => {
+        try {
+          const obj = JSON.parse(line);
+          if (obj.source_text) records.push(obj);
+        } catch { /* skip bad lines */ }
+      });
+      filePreview.textContent = text.slice(0, 2000) + (text.length > 2000 ? '\n…' : '');
+    } else {
+      // Plain text — treat each non-empty line as a record
+      const lines = text.split('\n').filter(l => l.trim());
+      records = lines.map(l => ({ source_lang: state.selectedLang, source_text: l, target_text: '' }));
+      filePreview.textContent = lines.slice(0, 40).join('\n') + (lines.length > 40 ? '\n…' : '');
+    }
+
+    state.fileRecords = records;
+    document.getElementById('fileStats').textContent = `${records.length} records loaded`;
+    fileTranslateBtn.disabled = records.length === 0;
+    state.metrics.files++;
+    updateMetrics();
+    toast(`Loaded ${records.length} records from ${file.name}`);
+  };
+  reader.readAsText(file);
+}
+
+fileTranslateBtn.addEventListener('click', async () => {
+  if (!state.fileRecords.length) return;
+  showLoading();
+  setStatus('BATCH TRANSLATING…');
+  fileTranslateBtn.disabled = true;
+  fileTranslations.textContent = '';
+
+  const results = [];
+  for (let i = 0; i < state.fileRecords.length; i++) {
+    const rec = state.fileRecords[i];
+    const lang = rec.source_lang || state.selectedLang;
+    const translation = await callTranslate(rec.source_text, lang);
+    results.push({ ...rec, translation });
+    fileTranslations.textContent += `[${i+1}/${state.fileRecords.length}] ${translation}\n\n`;
+    if (i === 0) {
+      state.currentTranslation = translation;
+      document.getElementById('sumExtractBtn').disabled = false;
+    }
+  }
+
+  state.metrics.translations += results.length;
+  updateMetrics();
+  fileExportBtn.disabled = false;
+  fileTranslateBtn.disabled = false;
+  hideLoading();
+  setStatus('SYSTEM READY');
+  toast(`Batch complete: ${results.length} translations ✓`);
+
+  fileExportBtn.onclick = () => {
+    const blob = new Blob([results.map(r => JSON.stringify(r)).join('\n')], {type:'application/x-ndjson'});
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `hadr_batch_${Date.now()}.jsonl`;
+    a.click();
+  };
+});
+
+// ─────────────────────────────────────────────────────────────
+// Init
+// ─────────────────────────────────────────────────────────────
+setStatus('SYSTEM READY');
+updateMetrics();
+
+// Keyboard shortcut: Ctrl+Enter to translate
+document.addEventListener('keydown', e => {
+  if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+    const panel = document.querySelector('.tab-panel.active');
+    if (panel.id === 'panel-text') document.getElementById('translateBtn').click();
+  }
+});
+</script>
+</body>
+</html>

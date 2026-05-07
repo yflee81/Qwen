@@ -152,7 +152,9 @@ tensorboard --logdir ./checkpoints/runs
 Key metrics to watch:
 - `train/loss` — should decrease steadily
 - `eval/bleu` — target > 40 for operational use
-- `eval/chrf` — complementary character-level metric
+- `eval/bertscore` — target > 90 for operational use
+
+---
 
 ---
 

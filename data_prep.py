@@ -24,7 +24,7 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(me
 logger = logging.getLogger(__name__)
 
 REQUIRED_KEYS = {"source_lang", "source_text", "target_text"}
-SUPPORTED_LANGS = {"ms", "zh", "id", "tl", "my", "lo", "th", "hi", "kr", "vi", "ja", "fr"}
+SUPPORTED_LANGS = {"ms", "zh", "id", "tl", "my", "lo", "th", "hi", "ko", "vi", "ja", "fr"}
 
 
 # ─────────────────────────────────────────────

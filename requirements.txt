@@ -16,7 +16,8 @@ pip install bert_score
 # Utilities
 pyyaml>=6.0
 numpy>=1.26.0
-tensorboard>=2.16.0       # swap for wandb if preferred
-
+tensorboard>=2.16.0  
+pip install openai-whisper sounddevice scipy     # swap for wandb if preferred
+pip install flask flask-cors
 # Optional — weights & biases
 # wandb>=0.17.0
