@@ -25,3 +25,6 @@ flask-cors>=4.0.0
 pywebview>=5.0
 # Optional — weights & biases
 # wandb>=0.17.0
+pip install -U sentence-transformers
+pip install deep-translator
+pip install googletrans==4.0.0rc1 tqdm
