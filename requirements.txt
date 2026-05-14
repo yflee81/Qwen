@@ -1,6 +1,7 @@
 # Core ML
-torch>=2.2.0
+torch>=2.6.0
 transformers>=4.47.0
+safetensors>=0.4.5
 datasets>=2.19.0
 peft>=0.10.0
 trl>=0.8.6
@@ -16,15 +17,16 @@ bert-score>=0.3.13
 # Utilities
 pyyaml>=6.0
 numpy>=1.26.0
-tensorboard>=2.16.0  
+tensorboard>=2.16.0
+sentence-transformers>=3.0.0
 openai-whisper>=20231117
 sounddevice>=0.4.6
 scipy>=1.13.0
 flask>=3.0.0
 flask-cors>=4.0.0
 pywebview>=5.0
+deep-translator>=1.11.4
+googletrans==4.0.0rc1
+tqdm>=4.66.0
 # Optional — weights & biases
 # wandb>=0.17.0
-pip install -U sentence-transformers
-pip install deep-translator
-pip install googletrans==4.0.0rc1 tqdm

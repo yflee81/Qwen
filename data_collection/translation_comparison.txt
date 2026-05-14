@@ -1,0 +1,4 @@
+Google translate:
+Accepted: 8967
+Rejected: 1825
+Errors: 1778
