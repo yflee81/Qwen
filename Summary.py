@@ -105,6 +105,24 @@ WHISPER_LANG_MAP = {
 # Model Loading
 # ─────────────────────────────────────────────
 
+def load_tokenizer(model_dir: Path):
+    """Load exported Qwen tokenizers across Transformers config-shape changes."""
+    try:
+        return AutoTokenizer.from_pretrained(str(model_dir), trust_remote_code=True)
+    except AttributeError as exc:
+        if "'list' object has no attribute 'keys'" not in str(exc):
+            raise
+        logger.warning(
+            "Tokenizer config has legacy list-style extra_special_tokens; "
+            "retrying with the Transformers 4.57-compatible mapping shape."
+        )
+        return AutoTokenizer.from_pretrained(
+            str(model_dir),
+            trust_remote_code=True,
+            extra_special_tokens={},
+        )
+
+
 def load_model(model_dir: str, base_model: str | None = None):
     """
     Load the fine-tuned model.
@@ -118,7 +136,7 @@ def load_model(model_dir: str, base_model: str | None = None):
             "Pass --model_dir with the path to merged_model or your checkpoint folder."
         )
 
-    tokenizer = AutoTokenizer.from_pretrained(str(model_dir), trust_remote_code=True)
+    tokenizer = load_tokenizer(model_dir)
 
     bnb_config = BitsAndBytesConfig(
         load_in_4bit=True,
