@@ -2,3 +2,21 @@ Google translate:
 Accepted: 8967
 Rejected: 1825
 Errors: 1778
+
+Codex translation:
+Accepted: 11030
+Rejected: 1534
+Errors: 0
+
+th  349
+lo  334
+my  212
+ko  204
+zh  114
+vi   85
+ja   74
+id   41
+ms   39
+tl   39
+fr   24
+hi   19

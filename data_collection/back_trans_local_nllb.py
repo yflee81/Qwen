@@ -27,6 +27,7 @@ LANG_CODE_MAP = {
     "ta": "tam_Taml",      # Tamil
     "bn": "ben_Beng",      # Bengali
     "ar": "arb_Arab",      # Arabic MSA
+    "fr": "fra_Latn",      # French
     "ja": "jpn_Jpan",      # Japanese
     "ko": "kor_Hang",      # Korean
 }
@@ -122,6 +123,27 @@ def translate_batch(
     return tokenizer.batch_decode(generated_tokens, skip_special_tokens=True)
 
 
+def load_translation_model(model_name: str, device: str):
+    """Load NLLB without leaving parameters on the meta device."""
+    model = AutoModelForSeq2SeqLM.from_pretrained(
+        model_name,
+        use_safetensors=False,
+        low_cpu_mem_usage=False,
+        device_map=None,
+    )
+
+    meta_params = [name for name, param in model.named_parameters() if param.is_meta]
+    if meta_params:
+        sample = ", ".join(meta_params[:5])
+        raise RuntimeError(
+            f"Model loaded with {len(meta_params)} meta tensor(s): {sample}. "
+            "The local Hugging Face cache for this model may be incomplete or corrupt; "
+            "delete the cached model files and download it again."
+        )
+
+    return model.to(device)
+
+
 def main():
     parser = argparse.ArgumentParser(
         description="Back-translate JSONL source_text to English using a local NLLB model, then filter by similarity."
@@ -131,7 +153,7 @@ def main():
     parser.add_argument("--rejected", default="rejected_dataset.jsonl", help="Rejected output JSONL")
     parser.add_argument("--errors", default="error_dataset.jsonl", help="Error output JSONL")
     parser.add_argument("--threshold", type=float, default=0.82, help="Similarity threshold")
-    parser.add_argument("--batch-size", type=int, default=16, help="Translation batch size")
+    parser.add_argument("--batch-size", type=int, default=48, help="Translation batch size")
     parser.add_argument("--chunk-size", type=int, default=256, help="Number of JSONL rows to process per chunk")
     parser.add_argument("--max-length", type=int, default=256, help="Max token length for translation")
     parser.add_argument(
@@ -156,7 +178,7 @@ def main():
 
     print(f"Loading translation model: {args.model}")
     tokenizer = AutoTokenizer.from_pretrained(args.model)
-    model = AutoModelForSeq2SeqLM.from_pretrained(args.model, use_safetensors=True).to(device)
+    model = load_translation_model(args.model, device)
     model.eval()
 
     print(f"Loading similarity model: {args.embedder}")
